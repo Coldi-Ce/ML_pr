@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width: 500px; margin: auto; padding: 2rem;">
+  <h2>Вход</h2>
+
+  <form method="POST" enctype="multipart/form-data">
+    <div style="margin-bottom: 1rem;">
+      <label>Email:</label><br>
+      <input type="email" name="email" class="form-control" placeholder="Введите email">
+    </div>
+    <div style="margin-bottom: 1rem;">
+      <label>Пароль:</label><br>
+      <input type="password" name="password" class="form-control" placeholder="Введите пароль">
+    </div>
+    <button type="submit" class="btn btn-primary">Войти по email и паролю</button>
+  </form>
+
+  <hr>
+
+  <h4>Или войдите по лицу через веб-камеру:</h4>
+  <div id="camera-container" style="text-align:center;">
+    <video id="video" width="320" height="240" autoplay muted style="border:1px solid #ccc;"></video><br>
+    <button id="snap-btn" class="btn btn-success" style="margin-top:0.5rem;">Сделать снимок и войти</button>
+    <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+  </div>
+</div>
+
+<script>
+// Запрашиваем доступ к камере
+const video = document.getElementById('video');
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => { video.srcObject = stream; })
+  .catch(err => { console.error('Не удалось получить доступ к камере:', err); });
+
+document.getElementById('snap-btn').addEventListener('click', () => {
+  const canvas = document.getElementById('canvas');
+  const context = canvas.getContext('2d');
+  // Захватываем текущий кадр
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  // Превращаем в Blob
+  canvas.toBlob(blob => {
+    const form = new FormData();
+    form.append('face_file', blob, 'snapshot.jpg');
+    // Отправляем POST-запрос на /login
+    fetch('{{ url_for("login") }}', {
+      method: 'POST',
+      body: form
+    })
+    .then(res => {
+      if (res.redirected) {
+        window.location.href = res.url;
+      } else {
+        return res.text().then(html => {
+          document.open();
+          document.write(html);
+          document.close();
+        });
+      }
+    })
+    .catch(err => console.error('Ошибка при отправке запроса:', err));
+  }, 'image/jpeg');
+});
+</script>
+{% endblock %}

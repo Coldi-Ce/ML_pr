@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 2rem auto;">
+  <h2 style="text-align: center;">Добро пожаловать {{ user.name }}</h2>
+  <div style="display: flex; justify-content: space-between; margin-top: 2rem;">
+
+    <div style="flex: 1; padding-right: 1rem;">
+      <h4>Снимок лица</h4>
+      {% if user.face_image %}
+        <img src="{{ url_for('static', filename='faces/' ~ user.face_image) }}"
+             alt="Фото лица"
+             style="width:100%; max-width:240px; object-fit:cover; border:1px solid #ccc;">
+      {% else %}
+        <p>Снимок лица не установлен</p>
+      {% endif %}
+
+      <div id="cameraContainer" style="margin-top:1rem;">
+        <video id="video_face" width="240" height="180" autoplay muted style="border:1px solid #ccc;"></video><br>
+        <button id="snap_face" class="btn btn-success" style="margin-top:0.5rem;">Снять фото лица</button>
+        <button id="stop_face" class="btn btn-danger" style="margin-top:0.5rem; margin-left:0.5rem;">Остановить камеру</button>
+        <canvas id="canvas_face" width="240" height="180" style="display:none;"></canvas>
+      </div>
+    </div>
+
+    <div style="flex: 1; text-align: center; padding: 0 1rem;">
+      <h4>Аватар</h4>
+      <img src="{{ url_for('static', filename='avatars/' ~ user.avatar) }}"
+           alt="Аватар"
+           style="width:200px; height:200px; object-fit:cover; display:block; margin:auto; border:1px solid #ccc;">
+      <form method="POST" enctype="multipart/form-data" style="margin-top:1rem;">
+        <input type="file" name="avatar" accept="image/*"><br>
+        <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">Сохранить аватар</button>
+      </form>
+    </div>
+
+    <!-- Правая колонка: Добавление видео -->
+    <div style="flex: 1; padding-left: 1rem;">
+      <h4>Добавить видео</h4>
+      <form method="POST" style="margin-bottom:1rem;">
+        <input type="url" name="video_url" placeholder="Ссылка на YouTube" class="form-control"
+               style="width:100%; max-width:300px; margin-bottom:0.5rem;"><br>
+        <textarea name="comment" rows="3" placeholder="Комментарий к видео" class="form-control"
+                  style="width:100%; max-width:300px; margin-bottom:0.5rem;"></textarea><br>
+        <input type="text" id="categorySearch" placeholder="Поиск категорий" class="form-control"
+               style="width:100%; max-width:300px; margin-bottom:0.5rem;"><br>
+        <select name="categories" id="categorySelect" multiple size="5" class="form-control"
+                style="width:100%; max-width:300px; margin-bottom:0.5rem;">
+          {% for cat in categories %}
+            <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select><br>
+        <button type="submit" class="btn btn-secondary" style="margin-top:0.5rem;">Добавить видео</button>
+      </form>
+    </div>
+
+  </div>
+
+  <div style="margin-top:2rem;">
+    <h4>Ваши видео</h4>
+    <ul>
+      {% for video in videos %}
+        <li style="margin-bottom:1rem;">
+          <a href="{{ url_for('view_video', video_id=video.id) }}">{{ video.title }}</a>
+          <small>(добавлено {{ video.timestamp.strftime('%Y-%m-%d %H:%M') }})</small><br>
+          {% if video.comment %}
+            {% set lines = video.comment.split('\n') %}
+            <p style="max-width:400px; margin:0.5rem 0;">
+              {{ lines[:2] | join('<br>') | safe }}
+              {% if lines|length > 2 %}
+                ... <a href="{{ url_for('view_video', video_id=video.id) }}">читать далее</a>
+              {% endif %}
+            </p>
+          {% endif %}
+          <div style="font-style:italic;">
+            Категории: {{ video.categories | map(attribute='name') | join(', ') }}
+          </div>
+        </li>
+      {% else %}
+        <p>Видео ещё нет</p>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+
+
+<script>
+  window.addEventListener('load', () => {
+    // Фильтрация категорий
+    const searchInput = document.getElementById('categorySearch');
+    const categorySelect = document.getElementById('categorySelect');
+    if (searchInput && categorySelect) {
+      searchInput.addEventListener('input', () => {
+        const filter = searchInput.value.toLowerCase();
+        Array.from(categorySelect.options).forEach(opt => opt.hidden = !opt.text.toLowerCase().includes(filter));
+      });
+    }
+
+    // Инициализация камеры при полной загрузке
+    const cameraContainer = document.getElementById('cameraContainer');
+    const videoFace = document.getElementById('video_face');
+    const snapBtn = document.getElementById('snap_face');
+    const stopBtn = document.getElementById('stop_face');
+    let streamFace = null;
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          streamFace = stream;
+          videoFace.srcObject = stream;
+          videoFace.play();
+          cameraContainer.style.display = 'block';
+        })
+        .catch(err => console.error('Ошибка доступа к камере:', err));
+    }
+
+    // Съёмка фото лица
+    if (snapBtn) {
+      snapBtn.addEventListener('click', e => {
+        e.preventDefault();
+        const canvas = document.getElementById('canvas_face');
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoFace, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          const form = new FormData();
+          form.append('face_file', blob, `face_${Date.now()}.jpg`);
+          fetch('{{ url_for("profile") }}', { method: 'POST', body: form })
+            .then(res => { if (res.redirected) window.location = res.url; })
+            .catch(console.error);
+        }, 'image/jpeg');
+      });
+    }
+
+    // Остановка камеры и скрытие контейнера
+    if (stopBtn) {
+      stopBtn.addEventListener('click', e => {
+        e.preventDefault();
+        if (streamFace) {
+          streamFace.getTracks().forEach(track => track.stop());
+          streamFace = null;
+        }
+        cameraContainer.style.display = 'none';
+      });
+    }
+  });
+</script>
+{% endblock %}

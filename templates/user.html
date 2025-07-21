@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<h2>Профиль пользователя</h2>
+<p><strong>Имя:</strong> {{ current_user.name }}</p>
+<p><strong>Email:</strong> {{ current_user.email }}</p>
+
+{% if current_user.face_filename %}
+    <h3>Фото лица:</h3>
+    <img src="{{ url_for('static', filename='uploads/' + current_user.face_filename) }}"
+         alt="face image" width="200" style="display:block; margin: 10px auto;">
+{% endif %}
+
+<hr>
+<h3>Загрузить/Обновить фото лица</h3>
+<form method="post" action="/upload_face" enctype="multipart/form-data">
+    <input type="file" name="face_image" accept="image/*" required>
+    <button type="submit">Обновить фото</button>
+</form>
+
+<div class="center" style="margin-top: 20px;">
+    <a href="/logout">Выйти из аккаунта</a>
+</div>
+{% endblock %}

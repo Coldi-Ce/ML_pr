@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width:800px; margin:2rem auto;">
+  <h2>Все видео пользователей</h2>
+  {% if videos %}
+    <ul style="list-style:none; padding:0;">
+      {% for v in videos %}
+        <li style="margin-bottom:1.5rem; border-bottom:1px solid #eee; padding-bottom:1rem;">
+
+          <a href="{{ url_for('view_video', video_id=v.id) }}"
+             style="font-size:1.1rem; font-weight:bold; text-decoration:none;">
+            {{ v.title }}
+          </a>
+          <div style="font-size:0.9rem; color:#666; margin-top:0.25rem;">
+            добавлено {{ v.timestamp.strftime('%Y-%m-%d %H:%M') }} пользователем {{ v.user.name or v.user.email }}
+          </div>
+          {% if v.categories %}
+            <div style="text-align:left; font-style:italic; margin-top:0.5rem;">
+              Категории: {{ v.categories | map(attribute='name') | join(', ') }}
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Видео ещё нет.</p>
+  {% endif %}
+</div>
+{% endblock %}
